@@ -309,6 +309,8 @@ thumbnail_display_help_info () {
   chafa-8 (256 color palette)
   chafa-grey/gray (greyscale)
 
+  imv (24-bit color, external window, works on X11 and Wayland)
+
   custom use a custom way to show images
   handle_display_img must be defined in config for this to work
   handle_display_img will run the command you want to run for displaying images
@@ -470,6 +472,17 @@ stop_ueberzug () {
     rm "$FIFO" > /dev/null 2>&1
 }
 
+IMV_PID="/tmp/ytfzf-imv.pid"
+start_imv () {
+    imv &
+    echo $! > "$IMV_PID"
+}
+
+stop_imv () {
+    imv-msg `cat "$IMV_PID"` quit
+    rm "$IMV_PID" > /dev/null 2>&1
+}
+
 preview_img () {
 
 	args="$*"
@@ -554,6 +567,8 @@ preview_img () {
 	    chafa-8)
 		printf "\n"
 		chafa --size="${thumb_width}x${thumb_height}" --colors=256 "$IMAGE" ;;
+        imv)
+        imv-msg `cat "$IMV_PID"` close && imv-msg `cat "$IMV_PID"` open "$IMAGE";;
 	    custom)
 		if ! function_exists "handle_display_img"; then
 		    printf "\033[031mERROR[#07]: \033[0m\033[1mhandle_display_img\033[0m is not defined" >&2
@@ -918,9 +933,10 @@ user_selection () {
 
 	#show thumbnail menu
 	elif [ "$show_thumbnails" -eq 1 ] ; then
-		dep_ck "ueberzug" "fzf"
+		dep_ck "fzf"
 		export YTFZF_THUMB_DISP_METHOD="$thumb_disp_method"
 		[ "$thumb_disp_method" = "ueberzug" ] && start_ueberzug
+		[ "$thumb_disp_method" = "imv" ] && start_imv
 		#thumbnails only work in fzf, use fzf
 		menu_command="fzf -m --tabstop=1 --bind change:top --delimiter=\"$tab_space\" \
 		--nth=1,2 --expect='$shortcuts' $FZF_DEFAULT_OPTS \
@@ -928,6 +944,7 @@ user_selection () {
         	--preview-window \"$PREVIEW_SIDE:50%:noborder:wrap\""
 		selected_data=$( title_len=200 video_menu "$videos_data" )
 		[ "$thumb_disp_method" = "ueberzug" ] && stop_ueberzug
+		[ "$thumb_disp_method" = "imv" ] && stop_imv
 		# Deletes thumbnails if no video is selected
 		[ -z "$selected_data" ] && clean_up
 	#show regular menu
@@ -1366,7 +1383,7 @@ create_subs () {
 verify_thumb_disp_method () {
     #make sure the thumb_disp_method is a valid method
     case "$thumb_disp_method" in
-	ueberzug|jp2a-grey|jp2a-gray|jp2a|jp2a-4|jp2a-8|catimg|custom|chafa|chafa-grey|chafa-gray|chafa-4|chafa-8) ;;
+	ueberzug|jp2a-grey|jp2a-gray|jp2a|jp2a-4|jp2a-8|catimg|custom|chafa|chafa-grey|chafa-gray|chafa-4|chafa-8|imv) ;;
 	*)
 	    print_error "ERROR[#06]: $thumb_disp_method is not a valid display method\nrun ytfzf --help-thumb-disp for more"
 	    exit 3 ;;
